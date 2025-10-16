@@ -16,6 +16,10 @@ export class ClickHandler {
     clickAnimationName: string = 'click'
   ) {
     this.raycaster = new THREE.Raycaster();
+    // Aumentar threshold para mejor deteccion
+    this.raycaster.params.Points!.threshold = 0.5;
+    this.raycaster.params.Line!.threshold = 0.5;
+    
     this.mouse = new THREE.Vector2();
     this.camera = camera;
     this.targetObject = targetObject;
@@ -25,24 +29,32 @@ export class ClickHandler {
     // Escuchar eventos de click
     window.addEventListener('click', this.onClick.bind(this), false);
     
-    console.log(`ClickHandler inicializado. Animación de click: "${clickAnimationName}"`);
+    console.log(`ClickHandler inicializado. Animacion de click: "${clickAnimationName}"`);
   }
 
   private onClick(event: MouseEvent): void {
-    // Calcular posición del mouse normalizada (-1 a +1)
+    // Ignorar clicks en la UI (botones de animacion)
+    const target = event.target as HTMLElement;
+    if (target.tagName === 'BUTTON' || target.closest('button')) {
+      return; // No procesar si es un boton
+    }
+
+    // Calcular posicion del mouse normalizada (-1 a +1)
     this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
     // Actualizar el raycaster
     this.raycaster.setFromCamera(this.mouse, this.camera);
 
-    // Buscar intersecciones con el objeto
+    // Buscar intersecciones con el objeto (recursive = true para todos los hijos)
     const intersects = this.raycaster.intersectObject(this.targetObject, true);
 
+    console.log(`Click en (${event.clientX}, ${event.clientY}), intersecciones: ${intersects.length}`);
+
     if (intersects.length > 0) {
-      console.log('Click detectado en el modelo!');
+      console.log('Click detectado en el modelo!', intersects[0].object.name || 'sin nombre');
       
-      // Reproducir animación si existe
+      // Reproducir animacion si existe
       if (this.animationController) {
         this.animationController.play(this.clickAnimationName, false); // false = reproducir una sola vez
       } else {
@@ -51,6 +63,8 @@ export class ClickHandler {
 
       // Efecto visual opcional: highlight del objeto clickeado
       this.highlightObject(intersects[0].object);
+    } else {
+      console.log('Click fuera del modelo');
     }
   }
 

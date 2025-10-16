@@ -9,9 +9,10 @@ export interface GLTFResult {
 
 /**
  * Carga un archivo glTF o GLB como THREE.Group con animaciones.
- * @param url Ruta pública al .gltf o .glb
+ * @param url Ruta publica al .gltf o .glb
+ * @param onProgress Callback opcional para reportar progreso
  */
-export function loadGLTF(url: string): Promise<GLTFResult> {
+export function loadGLTF(url: string, onProgress?: (percent: number) => void): Promise<GLTFResult> {
   return new Promise((resolve, reject) => {
     // 1. Configurar DRACOLoader si tu archivo usa Draco Compression
     const draco = new DRACOLoader();
@@ -57,7 +58,13 @@ export function loadGLTF(url: string): Promise<GLTFResult> {
           animations: gltf.animations || []
         });
       },
-      undefined,
+      (progress) => {
+        // Reportar progreso de carga
+        if (onProgress && progress.total > 0) {
+          const percent = (progress.loaded / progress.total) * 100;
+          onProgress(percent);
+        }
+      },
       (err) => reject(err)
     );
   });

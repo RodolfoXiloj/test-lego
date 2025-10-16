@@ -9,8 +9,11 @@ import { loadParts } from './partsLoader.js';
 import { HeadTracking } from './headTracking.js';
 import { AnimationController } from './animationController.js';
 import { ClickHandler } from './clickHandler.js';
+import { LoadingScreen } from './loadingScreen.js';
 
 async function init() {
+  // Mostrar loading screen
+  const loadingScreen = new LoadingScreen();
   const renderer = createRenderer();
   const camera = createCamera();
   setupLights(scene);
@@ -18,8 +21,13 @@ async function init() {
   const stats = createStats(); document.body.appendChild(stats.dom);
   scene.add(createFloor());
   
-  // Carga piezas y animaciones desde el archivo GLB
-  const { parts, animations } = await loadParts();
+  // Carga piezas y animaciones desde el archivo GLB con progreso
+  const { parts, animations } = await loadParts((percent) => {
+    loadingScreen.updateProgress(percent);
+  });
+  
+  // Ocultar loading screen
+  loadingScreen.hide();
   
   const root = parts['scene'];
   
