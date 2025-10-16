@@ -1,44 +1,89 @@
-// src/partsLoader.ts
 import * as THREE from 'three';
 import { loadGLTF } from './loader.js';
 
 export type PartMap = Record<string, THREE.Object3D>;
 
+export interface LoadedModel {
+  parts: PartMap;
+  animations: THREE.AnimationClip[];
+}
+
 /**
- * Carga la escena glTF y extrae:
- *  - El grupo raíz 'lego-completo'
- *  - Todos sus hijos directos (grupos y meshes)
+ * Función para recolectar todas las partes (meshes y grupos con nombre)
  */
-export async function loadParts(): Promise<PartMap> {
-  // 1. Carga la escena completa
-  const gltfScene = await loadGLTF('/figure-me/scene.gltf');
-
-  // 2. Obtén el grupo raíz
-  const legoGroup = gltfScene.getObjectByName('lego-completo') as THREE.Group;
-  if (!legoGroup) {
-    console.warn('⚠️ Grupo "lego-completo" no encontrado');
-    return {};
+function collectParts(obj: THREE.Object3D, parts: PartMap): void {
+  if (obj.name) {
+    parts[obj.name] = obj;
+    obj.castShadow = true;
+    obj.receiveShadow = true;
+    
+    // Configurar materiales para que respondan correctamente a la luz
+    if (obj instanceof THREE.Mesh) {
+      if (obj.material) {
+        const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+        materials.forEach(mat => {
+          if (mat instanceof THREE.MeshStandardMaterial || mat instanceof THREE.MeshPhysicalMaterial) {
+            // Preservar colores y texturas originales
+            mat.needsUpdate = true;
+            // Ajustar roughness y metalness para mejor apariencia
+            if (mat.roughness === undefined) mat.roughness = 0.7;
+            if (mat.metalness === undefined) mat.metalness = 0.0;
+            // Asegurar que el material responda a la luz correctamente
+            mat.envMapIntensity = 1.0;
+          } else if (mat instanceof THREE.MeshBasicMaterial) {
+            // Si es MeshBasicMaterial, no responde a luces - convertir a Standard
+            const newMat = new THREE.MeshStandardMaterial({
+              map: mat.map,
+              color: mat.color,
+              transparent: mat.transparent,
+              opacity: mat.opacity,
+              side: mat.side,
+            });
+            if (Array.isArray(obj.material)) {
+              const index = obj.material.indexOf(mat);
+              obj.material[index] = newMat;
+            } else {
+              obj.material = newMat;
+            }
+          }
+        });
+      }
+    }
   }
-
-  // 3. Añade el grupo raíz al mapa y configura transformaciones globales
-  const parts: PartMap = {
-    'lego-completo': legoGroup
-  };
-  legoGroup.castShadow    = true;
-  legoGroup.receiveShadow = true;
-  //legoGroup.scale.setScalar(0.1);
-
-  // 4. Recorre los hijos directos y añádelos también al mapa
-  legoGroup.children.forEach(child => {
-    if (!child.name) return;  // ignora nodos sin nombre
-
-    // Configurar cada parte individual (sombra, escala si es necesario)
-    child.castShadow    = true;
-    child.receiveShadow = true;
-    // child.scale.setScalar(0.1); // opcional: escala local
-    parts[child.name] = child;
+  
+  obj.children.forEach((child: THREE.Object3D) => {
+    collectParts(child, parts);
   });
+}
 
-  console.log('🔍 Partes disponibles:', Object.keys(parts).join(', '));            // ej: lego-completo, rcadera-cabeza, pierna-izquierdaobj, ...
-  return parts;
+/**
+ * Carga la escena GLB desde /model3d y extrae todas las partes
+ */
+export async function loadParts(): Promise<LoadedModel> {
+  const gltfResult = await loadGLTF('/model3d/untitled.glb');
+  const gltfScene = gltfResult.scene;
+  
+  const parts: PartMap = {};
+  collectParts(gltfScene, parts);
+  
+  parts['scene'] = gltfScene;
+  gltfScene.castShadow = true;
+  gltfScene.receiveShadow = true;
+  
+  // Ocultar cilindros no deseados
+  const cylindersToHide: string[] = [
+    'FinishedRHBool', // Cilindro mano derecha
+    'FinishedRLBool', // Cilindro mano izquierda
+  ];
+  
+  cylindersToHide.forEach(pieceName => {
+    if (parts[pieceName]) {
+      parts[pieceName].visible = false;
+    }
+  });
+  
+  return {
+    parts,
+    animations: gltfResult.animations
+  };
 }
