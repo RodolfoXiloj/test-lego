@@ -48,9 +48,7 @@ async function init() {
     console.log('No se encontraron animaciones en el GLB');
   }
   
-  // Configurar click handler
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  let clickHandler: ClickHandler | null = null;
+  // Configurar click handler para detectar clicks en el modelo
   if (root) {
     // Buscar si existe una animación llamada "click" o similar
     const clickAnimNames = ['click', 'Click', 'onclick', 'OnClick', 'action'];
@@ -69,7 +67,8 @@ async function init() {
       }
     }
     
-    clickHandler = new ClickHandler(camera, root, animationController, clickAnimName);
+    // Crear el handler (no necesitamos guardar la referencia)
+    new ClickHandler(camera, root, animationController, clickAnimName);
     console.log(`ClickHandler configurado. Click en el modelo para reproducir: "${clickAnimName}"`);
   }
   
